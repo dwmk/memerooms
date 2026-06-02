@@ -314,49 +314,51 @@ export class BackroomsGenerator {
     ceiling.userData.type = 'ceiling'
     this.scene.add(ceiling)
 
-    // Generate maze-like walls
+    // Generate backrooms structure with interconnected rooms
     const seed = this.hashCode(chunkKey)
     const random = this.seededRandom(seed)
 
-    // Create spacious rooms with strategic wall placements
-    for (let x = 0; x < this.chunkSize; x += ROOM_SIZE) {
-      for (let z = 0; z < this.chunkSize; z += ROOM_SIZE) {
-        const worldX = chunkX + x
-        const worldZ = chunkZ + z
+    // Create proper rooms and corridors
+    for (let roomX = 0; roomX < this.chunkSize; roomX += ROOM_SIZE) {
+      for (let roomZ = 0; roomZ < this.chunkSize; roomZ += ROOM_SIZE) {
+        const worldX = chunkX + roomX
+        const worldZ = chunkZ + roomZ
 
-        // Main corridor walls - less dense, more open
-        if (random() > 0.7) {
-          // Full wall segment
-          this.createWall(worldX, worldZ, ROOM_SIZE, 0.3, false)
-        } else if (random() > 0.5) {
-          // Partial wall with doorway
-          const doorPos = random()
-          if (doorPos < 0.33) {
-            this.createWall(worldX + CORRIDOR_WIDTH, worldZ, ROOM_SIZE - CORRIDOR_WIDTH, 0.3, false)
-          } else if (doorPos < 0.66) {
-            this.createWall(worldX, worldZ, ROOM_SIZE - CORRIDOR_WIDTH, 0.3, false)
-          } else {
-            // Wall with center opening
-            this.createWall(worldX, worldZ, (ROOM_SIZE - CORRIDOR_WIDTH) / 2, 0.3, false)
-            this.createWall(worldX + ROOM_SIZE - (ROOM_SIZE - CORRIDOR_WIDTH) / 2, worldZ, (ROOM_SIZE - CORRIDOR_WIDTH) / 2, 0.3, false)
-          }
+        // Create rectangular rooms with 4 walls
+        // North wall
+        this.createWall(worldX, worldZ, ROOM_SIZE, 0.3, false)
+        
+        // South wall
+        this.createWall(worldX, worldZ + ROOM_SIZE - 0.3, ROOM_SIZE, 0.3, false)
+        
+        // West wall
+        this.createWall(worldX, worldZ, 0.3, ROOM_SIZE, true)
+        
+        // East wall
+        this.createWall(worldX + ROOM_SIZE - 0.3, worldZ, 0.3, ROOM_SIZE, true)
+
+        // Create doorways randomly to connect rooms
+        const doorChance = random()
+        
+        // North doorway - connect to room above
+        if (doorChance > 0.6 && roomZ > 0) {
+          // Remove middle section of north wall for doorway
+          this.createWall(worldX, worldZ, ROOM_SIZE * 0.2, 0.3, false)
+          this.createWall(worldX + ROOM_SIZE * 0.8, worldZ, ROOM_SIZE * 0.2, 0.3, false)
+        }
+        
+        // East doorway - connect to room right
+        const doorChance2 = random()
+        if (doorChance2 > 0.6 && roomX + ROOM_SIZE < this.chunkSize) {
+          // Remove middle section of east wall for doorway
+          this.createWall(worldX + ROOM_SIZE - 0.3, worldZ, 0.3, ROOM_SIZE * 0.2, true)
+          this.createWall(worldX + ROOM_SIZE - 0.3, worldZ + ROOM_SIZE * 0.8, 0.3, ROOM_SIZE * 0.2, true)
         }
 
-        // Perpendicular walls
-        if (random() > 0.7) {
-          this.createWall(worldX, worldZ, 0.3, ROOM_SIZE, true)
-        } else if (random() > 0.5) {
-          const doorPos = random()
-          if (doorPos < 0.5) {
-            this.createWall(worldX, worldZ + CORRIDOR_WIDTH, 0.3, ROOM_SIZE - CORRIDOR_WIDTH, true)
-          } else {
-            this.createWall(worldX, worldZ, 0.3, ROOM_SIZE - CORRIDOR_WIDTH, true)
-          }
-        }
-
-        // Occasional support columns
-        if (random() > 0.85) {
-          this.createColumn(worldX + ROOM_SIZE / 2, worldZ + ROOM_SIZE / 2)
+        // Add occasional support columns in room
+        if (random() > 0.75) {
+          this.createColumn(worldX + ROOM_SIZE * 0.33, worldZ + ROOM_SIZE * 0.33)
+          this.createColumn(worldX + ROOM_SIZE * 0.66, worldZ + ROOM_SIZE * 0.66)
         }
       }
     }

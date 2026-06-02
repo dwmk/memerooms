@@ -137,10 +137,16 @@ export class EntityManager {
 
     this.mutationTime += deltaTime
 
+    // First pass: Update all existing entities
     this.entities.forEach(({ state, mesh, sprite }) => {
       const dx = playerPosition.x - state.position.x
       const dz = playerPosition.z - state.position.z
       const distanceToPlayer = Math.sqrt(dx * dx + dz * dz)
+
+      // Remove entities that are too far away to despawn old ones
+      if (distanceToPlayer > 150) {
+        return // Will be cleaned up later
+      }
 
       // Check if player is in detection range
       if (distanceToPlayer < this.config.entityDetectionRange) {
@@ -175,9 +181,11 @@ export class EntityManager {
         }
       } else {
         state.isChasing = false
-        // Wander randomly when not chasing
-        state.position.x += (Math.random() - 0.5) * deltaTime * 2
-        state.position.z += (Math.random() - 0.5) * deltaTime * 2
+        // Wander randomly when not chasing, but stay within reasonable distance
+        if (distanceToPlayer < 120) {
+          state.position.x += (Math.random() - 0.5) * deltaTime * 2
+          state.position.z += (Math.random() - 0.5) * deltaTime * 2
+        }
       }
 
       // Goofy mode mutations
@@ -200,10 +208,47 @@ export class EntityManager {
       sprite.lookAt(this.camera.position)
     })
 
-    // Spawn new entities periodically if being chased
-    if (isBeingChased && this.entities.size < 5 && Math.random() < 0.001) {
+    // Second pass: Clean up entities that are too far
+    const entitiesToRemove: string[] = []
+    this.entities.forEach(({ state }, id) => {
+      const dx = playerPosition.x - state.position.x
+      const dz = playerPosition.z - state.position.z
+      const distanceToPlayer = Math.sqrt(dx * dx + dz * dz)
+      
+      if (distanceToPlayer > 150) {
+        entitiesToRemove.push(id)
+      }
+    })
+    
+    // Remove distant entities
+    entitiesToRemove.forEach(id => {
+      const entity = this.entities.get(id)
+      if (entity) {
+        this.scene.remove(entity.mesh)
+        this.scene.remove(entity.sprite)
+        this.entities.delete(id)
+      }
+    })
+
+    // Spawn new entities continuously - much more aggressive spawning
+    // Spawn if not at max capacity
+    const maxEntities = Math.max(8, 3 + Math.floor(Math.sqrt(currentTime)))
+    
+    if (this.entities.size < maxEntities && Math.random() < 0.005) {
       const angle = Math.random() * Math.PI * 2
-      const distance = 30 + Math.random() * 20
+      const distance = 40 + Math.random() * 40
+      const spawnPos = new THREE.Vector3(
+        playerPosition.x + Math.cos(angle) * distance,
+        0,
+        playerPosition.z + Math.sin(angle) * distance
+      )
+      this.spawnEntity(spawnPos)
+    }
+
+    // Always spawn some entities even if not being chased
+    if (this.entities.size < 3) {
+      const angle = Math.random() * Math.PI * 2
+      const distance = 50 + Math.random() * 30
       const spawnPos = new THREE.Vector3(
         playerPosition.x + Math.cos(angle) * distance,
         0,

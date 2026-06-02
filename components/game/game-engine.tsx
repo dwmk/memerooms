@@ -42,6 +42,8 @@ export function useGameEngine({
   const isPausedRef = useRef(false)
   const currentModeRef = useRef<GameMode>(mode)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const audioSourceRef = useRef<AudioBufferSourceNode | null>(null)
 
   const initScene = useCallback(() => {
     if (!containerRef.current || isInitializedRef.current) return
@@ -101,8 +103,40 @@ export function useGameEngine({
     const player = new PlayerController(camera)
     playerRef.current = player
 
+    // Set colliders and position player safely away from walls
+    const colliders = backrooms.getColliders()
+    player.setColliders(colliders)
+    player.resetToSpawnPosition(colliders)
+
     // Spawn initial entities
     entities.spawnInitialEntities(player.getPosition(), 3)
+
+    // Initialize audio
+    if (youtubeUrl) {
+      // YouTube audio handling - would need YouTube API
+      console.log('[v0] YouTube URL provided but requires API setup')
+    } else {
+      // Load default ambient audio
+      const audioElement = new Audio()
+      audioElement.src = config.defaultAudio
+      audioElement.loop = true
+      audioElement.volume = 0.3
+      audioRef.current = audioElement
+      
+      // Try to play audio with user interaction handling
+      const playAudio = () => {
+        if (audioRef.current && audioRef.current.paused) {
+          audioRef.current.play().catch(err => {
+            console.log('[v0] Audio playback failed (may require user interaction):', err)
+          })
+        }
+        document.removeEventListener('click', playAudio)
+        document.removeEventListener('keydown', playAudio)
+      }
+      
+      document.addEventListener('click', playAudio)
+      document.addEventListener('keydown', playAudio)
+    }
 
     // Increment games started
     incrementGamesStarted()
@@ -127,7 +161,7 @@ export function useGameEngine({
     return () => {
       window.removeEventListener('resize', handleResize)
     }
-  }, [customTextures])
+  }, [customTextures, youtubeUrl])
 
   const gameLoop = useCallback(() => {
     if (!isInitializedRef.current) return
@@ -181,6 +215,9 @@ export function useGameEngine({
           const playTimeMinutes = (performance.now() - gameStartTimeRef.current) / 60000
           addPlayTime(playTimeMinutes)
           
+          // Release mouse cursor on game over
+          playerRef.current.exitPointerLock()
+          
           onGameOver(finalScore)
           return
         }
@@ -232,9 +269,16 @@ export function useGameEngine({
     playerRef.current?.cleanup()
     entitiesRef.current?.clear()
     
+    // Clean up audio
     if (audioRef.current) {
       audioRef.current.pause()
+      audioRef.current.src = ''
       audioRef.current = null
+    }
+    
+    if (audioSourceRef.current) {
+      audioSourceRef.current.stop()
+      audioSourceRef.current = null
     }
 
     sceneRef.current = null
@@ -262,6 +306,10 @@ export function useGameEngine({
 
   const reset = useCallback(() => {
     cleanup()
+    // Reset audio pause state
+    if (audioRef.current) {
+      audioRef.current.currentTime = 0
+    }
     setTimeout(() => {
       initScene()
     }, 100)

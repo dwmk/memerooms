@@ -15,6 +15,7 @@ export class PlayerController {
   private state: PlayerState
   private keys: Set<string> = new Set()
   private mouseLocked = false
+  private mouseLocation = false
   private sensitivity = 0.002
   private camera: THREE.PerspectiveCamera
   private colliders: THREE.Mesh[] = []
@@ -81,6 +82,50 @@ export class PlayerController {
 
   setColliders(colliders: THREE.Mesh[]) {
     this.colliders = colliders
+  }
+
+  resetToSpawnPosition(colliders: THREE.Mesh[]) {
+    this.colliders = colliders
+    this.state = { ...DEFAULT_PLAYER_STATE }
+    this.state.bhopMultiplier = 1
+    this.state.isBhopping = false
+    this.keys.clear()
+    this.mouseLocation = false
+    this.lastJumpTime = 0
+    this.landingTime = 0
+    this.canBhop = false
+
+    // Find a safe spawn position not inside walls
+    let spawnPos = { x: 0, y: 1.8, z: 0 }
+    let attempts = 0
+    const maxAttempts = 20
+
+    while (attempts < maxAttempts) {
+      const testX = (Math.random() - 0.5) * 40
+      const testZ = (Math.random() - 0.5) * 40
+      const playerPos = new THREE.Vector3(testX, 1.8, testZ)
+      
+      let isColliding = false
+      for (const collider of colliders) {
+        const box = new THREE.Box3().setFromObject(collider)
+        box.expandByScalar(0.5)
+        
+        if (box.containsPoint(playerPos)) {
+          isColliding = true
+          break
+        }
+      }
+      
+      if (!isColliding) {
+        spawnPos = { x: testX, y: 1.8, z: testZ }
+        break
+      }
+      
+      attempts++
+    }
+
+    this.state.position = spawnPos
+    this.camera.position.set(spawnPos.x, spawnPos.y, spawnPos.z)
   }
 
   // Mobile joystick input
