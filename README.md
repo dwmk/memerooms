@@ -79,3 +79,8 @@ When v0 paused, this was used:
 ```
 Continue generating exactly where you left off, keeping the high fidelity.
 ```
+
+Further prompts for fixing issues or improving the game:
+```
+audio files placed and named correctly as they can be accessed from public URL. But not played within the game during live game session. Tried with custom audio track via YouTube video link, still no sound heard. Entities not spawning endlessly. If player moves away too far away, e.g. 100 blocks, previous entities can despawn and be deleted. Currently if player runs away too far then no new nextbot entities appear. Also, map generation produces only one side of wall and not rooms. Supposed to be like backrooms structure. Also make sure player does not spawn inside a wall by mistake. When player dies (game over) automatically release mouse cursor. Everything else intact!
+```

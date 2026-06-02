@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import { EntityState, GameModeConfig } from './types'
 import { v4 as uuidv4 } from 'crypto'
 
-const ENTITY_HEIGHT = 2.5
+const ENTITY_HEIGHT = 4.5
 const DAMAGE_COOLDOWN = 0.5
 const DAMAGE_AMOUNT = 10
 
@@ -144,7 +144,7 @@ export class EntityManager {
       const distanceToPlayer = Math.sqrt(dx * dx + dz * dz)
 
       // Remove entities that are too far away to despawn old ones
-      if (distanceToPlayer > 150) {
+      if (distanceToPlayer > 500) {
         return // Will be cleaned up later
       }
 

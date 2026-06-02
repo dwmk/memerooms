@@ -233,7 +233,7 @@ export function MainMenu({
 
         {/* Credits */}
         <div className="text-right text-gray-500 text-sm">
-          Made by <span className="text-gray-400 font-bold">Dewan Mukto</span>
+          Made by <span className="text-gray-400 font-bold"><a target="_blank" href="https://dewanmukto.github.io">Dewan Mukto</a></span>
         </div>
       </div>
 
