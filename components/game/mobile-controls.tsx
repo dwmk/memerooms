@@ -39,7 +39,7 @@ export function VirtualJoystick({ onMove, size = 120 }: JoystickProps) {
     if (!isActive) return
     
     const x = (clientX - centerRef.current.x) / (size / 2)
-    const y = (clientY - centerRef.current.y) / (size / 2)
+    const y = -(clientY - centerRef.current.y) / (size / 2)
     
     const length = Math.sqrt(x * x + y * y)
     const clampedLength = Math.min(1, length)

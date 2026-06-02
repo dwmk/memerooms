@@ -76,7 +76,7 @@ export const GAME_MODE_CONFIGS: Record<GameMode, GameModeConfig> = {
     // Much brighter fog settings for visibility
     fogColor: 0x8B8B6B,
     fogNear: 15,
-    fogFar: 80,
+    fogFar: 50,
     ambientLight: 0.6,
     // Classic backrooms palette
     floorColor: 0x8B7355,    // Tan carpet
@@ -85,9 +85,9 @@ export const GAME_MODE_CONFIGS: Record<GameMode, GameModeConfig> = {
     lightColor: 0xFFF8DC,    // Warm fluorescent
     lightIntensity: 2.5,     // Brighter lights
     lightFlicker: true,
-    entitySpeed: 3,
+    entitySpeed: 9,
     entityDetectionRange: 50,
-    entityBehavior: 'creeping',
+    entityBehavior: 'chaotic',
     fontFamily: 'var(--font-creepster)',
     uiPrimaryColor: '#1a0a0a',
     uiSecondaryColor: '#2d1f1f',
@@ -135,9 +135,9 @@ export const GAME_MODE_CONFIGS: Record<GameMode, GameModeConfig> = {
     lightColor: 0xFF00FF,
     lightIntensity: 3.5,
     lightFlicker: false,
-    entitySpeed: 6,
+    entitySpeed: 3,
     entityDetectionRange: 15,
-    entityBehavior: 'chaotic',
+    entityBehavior: 'creeping',
     fontFamily: 'var(--font-bangers)',
     uiPrimaryColor: '#1a0a2a',
     uiSecondaryColor: '#2a1a3a',
