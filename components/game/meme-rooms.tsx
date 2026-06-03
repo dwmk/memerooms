@@ -1,9 +1,13 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
-import { GameMode, PlayerState, DEFAULT_PLAYER_STATE } from '@/lib/game/types'
+import { GameMode, PlayerState, DEFAULT_PLAYER_STATE, CustomEntitySettings, DEFAULT_CUSTOM_ENTITY_SETTINGS } from '@/lib/game/types'
+import { loadCustomSettings, loadCustomTextures, saveCustomTextures } from '@/lib/game/storage'
 import { MainMenu } from '@/components/game/main-menu'
-import { GameHUD, GameOverScreen } from '@/components/game/game-hud'
+import { GameHUD } from '@/components/game/game-hud'
+import { ScoreSubmitModal } from '@/components/game/score-submit-modal'
+import { LeaderboardModal } from '@/components/game/leaderboard-modal'
+import { CustomizeModal } from '@/components/game/customize-modal'
 import { MobileControls, RotateDeviceModal, useMobileDetection } from '@/components/game/mobile-controls'
 import { useGameEngine } from '@/components/game/game-engine'
 
@@ -17,8 +21,19 @@ export default function MemeRoomsGame() {
   const [playerState, setPlayerState] = useState<PlayerState>(DEFAULT_PLAYER_STATE)
   const [isPaused, setIsPaused] = useState(false)
   const [finalScore, setFinalScore] = useState(0)
+  
+  // New state for modals and custom settings
+  const [showLeaderboard, setShowLeaderboard] = useState(false)
+  const [showCustomize, setShowCustomize] = useState(false)
+  const [customSettings, setCustomSettings] = useState<CustomEntitySettings>(DEFAULT_CUSTOM_ENTITY_SETTINGS)
 
   const { isMobile, isPortrait } = useMobileDetection()
+
+  // Load saved settings and textures on mount
+  useEffect(() => {
+    setCustomSettings(loadCustomSettings())
+    setCustomTextures(loadCustomTextures())
+  }, [])
 
   const handleGameOver = useCallback((gameScore: number) => {
     setFinalScore(gameScore)
@@ -42,6 +57,7 @@ export default function MemeRoomsGame() {
     onHealthChange: setHealth,
     onPlayerStateChange: setPlayerState,
     onGameOver: handleGameOver,
+    customEntitySettings: customSettings, // Pass custom settings to game engine
   })
 
   const handleStartGame = useCallback((selectedMode: GameMode) => {
@@ -98,6 +114,11 @@ export default function MemeRoomsGame() {
     }, 200)
   }, [isMobile, requestPointerLock, reset])
 
+  const handleTexturesChange = useCallback((textures: string[]) => {
+    setCustomTextures(textures)
+    saveCustomTextures(textures)
+  }, [])
+
   // Handle ESC key for pause
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -135,13 +156,36 @@ export default function MemeRoomsGame() {
     <div className="w-screen h-screen overflow-hidden bg-black">
       {/* Main Menu */}
       {gameState === 'menu' && (
-        <MainMenu
-          onStartGame={handleStartGame}
-          customTextures={customTextures}
-          onTexturesChange={setCustomTextures}
-          youtubeUrl={youtubeUrl}
-          onYoutubeUrlChange={setYoutubeUrl}
-        />
+        <>
+          <MainMenu
+            onStartGame={handleStartGame}
+            customTextures={customTextures}
+            onTexturesChange={handleTexturesChange}
+            youtubeUrl={youtubeUrl}
+            onYoutubeUrlChange={setYoutubeUrl}
+            onOpenLeaderboard={() => setShowLeaderboard(true)}
+            onOpenCustomize={() => setShowCustomize(true)}
+            customSettings={customSettings}
+          />
+
+          {/* Leaderboard Modal */}
+          <LeaderboardModal
+            isOpen={showLeaderboard}
+            onClose={() => setShowLeaderboard(false)}
+            mode={mode}
+          />
+
+          {/* Customize Modal */}
+          <CustomizeModal
+            isOpen={showCustomize}
+            onClose={() => setShowCustomize(false)}
+            mode={mode}
+            customTextures={customTextures}
+            onTexturesChange={handleTexturesChange}
+            customSettings={customSettings}
+            onSettingsChange={setCustomSettings}
+          />
+        </>
       )}
 
       {/* Game Canvas */}
@@ -175,9 +219,10 @@ export default function MemeRoomsGame() {
             />
           )}
 
-          {/* Game Over Screen */}
+          {/* Score Submit Modal (replaces old GameOverScreen) */}
           {gameState === 'gameover' && (
-            <GameOverScreen
+            <ScoreSubmitModal
+              isOpen={true}
               score={finalScore}
               mode={mode}
               onRestart={handleRestart}

@@ -1,6 +1,9 @@
-import { GameStats, DEFAULT_GAME_STATS, GameMode } from './types'
+import { GameStats, DEFAULT_GAME_STATS, GameMode, PlayerIdentity, CustomEntitySettings, DEFAULT_CUSTOM_ENTITY_SETTINGS } from './types'
 
 const STORAGE_KEY = 'memerooms_stats'
+const PLAYER_KEY = 'memerooms_player'
+const CUSTOM_SETTINGS_KEY = 'memerooms_custom_settings'
+const CUSTOM_TEXTURES_KEY = 'memerooms_custom_textures'
 
 export function loadStats(): GameStats {
   if (typeof window === 'undefined') return DEFAULT_GAME_STATS
@@ -65,4 +68,83 @@ export function formatPlayTime(minutes: number): string {
     return `${hours}h ${mins}m`
   }
   return `${mins}m`
+}
+
+// Player identity functions
+export function loadPlayer(): PlayerIdentity | null {
+  if (typeof window === 'undefined') return null
+  
+  try {
+    const stored = localStorage.getItem(PLAYER_KEY)
+    if (stored) {
+      return JSON.parse(stored) as PlayerIdentity
+    }
+  } catch (e) {
+    console.error('Failed to load player:', e)
+  }
+  return null
+}
+
+export function savePlayer(player: PlayerIdentity): void {
+  if (typeof window === 'undefined') return
+  
+  try {
+    localStorage.setItem(PLAYER_KEY, JSON.stringify(player))
+  } catch (e) {
+    console.error('Failed to save player:', e)
+  }
+}
+
+export function generateDiscriminator(): string {
+  return Math.floor(1000 + Math.random() * 9000).toString()
+}
+
+// Custom entity settings functions
+export function loadCustomSettings(): CustomEntitySettings {
+  if (typeof window === 'undefined') return { ...DEFAULT_CUSTOM_ENTITY_SETTINGS }
+  
+  try {
+    const stored = localStorage.getItem(CUSTOM_SETTINGS_KEY)
+    if (stored) {
+      return JSON.parse(stored) as CustomEntitySettings
+    }
+  } catch (e) {
+    console.error('Failed to load custom settings:', e)
+  }
+  return { ...DEFAULT_CUSTOM_ENTITY_SETTINGS }
+}
+
+export function saveCustomSettings(settings: CustomEntitySettings): void {
+  if (typeof window === 'undefined') return
+  
+  try {
+    localStorage.setItem(CUSTOM_SETTINGS_KEY, JSON.stringify(settings))
+  } catch (e) {
+    console.error('Failed to save custom settings:', e)
+  }
+}
+
+// Custom textures functions
+export function loadCustomTextures(): string[] {
+  if (typeof window === 'undefined') return []
+  
+  try {
+    const stored = localStorage.getItem(CUSTOM_TEXTURES_KEY)
+    if (stored) {
+      return JSON.parse(stored) as string[]
+    }
+  } catch (e) {
+    console.error('Failed to load custom textures:', e)
+  }
+  return []
+}
+
+export function saveCustomTextures(textures: string[]): void {
+  if (typeof window === 'undefined') return
+  
+  try {
+    localStorage.setItem(CUSTOM_TEXTURES_KEY, JSON.stringify(textures))
+  } catch (e) {
+    console.error('Failed to save custom textures:', e)
+  }
 }

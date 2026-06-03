@@ -1,8 +1,10 @@
 'use client'
 
-import { useRef, useState, useCallback, useEffect } from 'react'
-import { GameMode, GAME_MODE_CONFIGS, GameStats, DEFAULT_GAME_STATS } from '@/lib/game/types'
-import { loadStats, formatPlayTime } from '@/lib/game/storage'
+import { useState, useEffect } from 'react'
+import { GameMode, GAME_MODE_CONFIGS, GameStats, DEFAULT_GAME_STATS, CustomEntitySettings, DEFAULT_CUSTOM_ENTITY_SETTINGS } from '@/lib/game/types'
+import { loadStats, formatPlayTime, loadCustomSettings, loadCustomTextures } from '@/lib/game/storage'
+import { MenuBackground3D } from './menu-background-3d'
+import { BarChart3, Trophy, Paintbrush, Play, X, Music } from 'lucide-react'
 
 interface MainMenuProps {
   onStartGame: (mode: GameMode) => void
@@ -10,6 +12,9 @@ interface MainMenuProps {
   onTexturesChange: (textures: string[]) => void
   youtubeUrl: string
   onYoutubeUrlChange: (url: string) => void
+  onOpenLeaderboard: () => void
+  onOpenCustomize: () => void
+  customSettings: CustomEntitySettings
 }
 
 export function MainMenu({ 
@@ -17,223 +22,201 @@ export function MainMenu({
   customTextures, 
   onTexturesChange,
   youtubeUrl,
-  onYoutubeUrlChange 
+  onYoutubeUrlChange,
+  onOpenLeaderboard,
+  onOpenCustomize,
+  customSettings
 }: MainMenuProps) {
   const [selectedMode, setSelectedMode] = useState<GameMode>('horror')
   const [showStats, setShowStats] = useState(false)
   const [stats, setStats] = useState<GameStats>(DEFAULT_GAME_STATS)
-  const [isDragging, setIsDragging] = useState(false)
-  const dropZoneRef = useRef<HTMLDivElement>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [showYoutubeInput, setShowYoutubeInput] = useState(false)
+
+  const config = GAME_MODE_CONFIGS[selectedMode]
 
   useEffect(() => {
     setStats(loadStats())
   }, [])
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragging(true)
-  }, [])
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragging(false)
-  }, [])
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragging(false)
-    
-    const files = Array.from(e.dataTransfer.files).filter(
-      file => file.type.startsWith('image/')
-    )
-    
-    if (files.length > 0) {
-      const newTextures: string[] = []
-      files.forEach(file => {
-        const reader = new FileReader()
-        reader.onload = () => {
-          newTextures.push(reader.result as string)
-          if (newTextures.length === files.length) {
-            onTexturesChange([...customTextures, ...newTextures])
-          }
-        }
-        reader.readAsDataURL(file)
-      })
-    }
-  }, [customTextures, onTexturesChange])
-
-  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || [])
-    if (files.length > 0) {
-      const newTextures: string[] = []
-      files.forEach(file => {
-        const reader = new FileReader()
-        reader.onload = () => {
-          newTextures.push(reader.result as string)
-          if (newTextures.length === files.length) {
-            onTexturesChange([...customTextures, ...newTextures])
-          }
-        }
-        reader.readAsDataURL(file)
-      })
-    }
-  }, [customTextures, onTexturesChange])
-
-  const removeTexture = (index: number) => {
-    const newTextures = [...customTextures]
-    newTextures.splice(index, 1)
-    onTexturesChange(newTextures)
-  }
-
-  const config = GAME_MODE_CONFIGS[selectedMode]
+  // Check if using custom entity settings
+  const isUsingCustomSettings = 
+    customSettings.speed !== DEFAULT_CUSTOM_ENTITY_SETTINGS.speed ||
+    customSettings.detectionRange !== DEFAULT_CUSTOM_ENTITY_SETTINGS.detectionRange ||
+    customSettings.behavior !== DEFAULT_CUSTOM_ENTITY_SETTINGS.behavior ||
+    customTextures.length > 0
 
   return (
-    <div 
-      className="fixed inset-0 flex items-center justify-center p-4 overflow-auto"
-      style={{ 
-        background: `linear-gradient(135deg, ${config.uiPrimaryColor} 0%, ${config.uiSecondaryColor} 100%)`,
-        fontFamily: config.fontFamily
-      }}
-    >
-      <div className="w-full max-w-4xl space-y-6">
-        {/* Header */}
-        <div className="text-center">
+    <div className="fixed inset-0 overflow-hidden" style={{ fontFamily: config.fontFamily }}>
+      {/* 3D Background */}
+      <MenuBackground3D mode={selectedMode} />
+
+      {/* Overlay for better readability */}
+      <div className="absolute inset-0 bg-black/40" />
+
+      {/* Main Content */}
+      <div className="relative z-10 h-full flex flex-col">
+        {/* Top Bar - Stats & Leaderboard */}
+        <div className="flex justify-between items-start p-4 md:p-6">
+          {/* Stats Button - Top Left */}
+          <button
+            onClick={() => setShowStats(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl backdrop-blur-md border transition-all hover:scale-105"
+            style={{ 
+              backgroundColor: `${config.uiPrimaryColor}cc`,
+              borderColor: `${config.uiAccentColor}40`
+            }}
+          >
+            <BarChart3 className="w-5 h-5" style={{ color: config.uiAccentColor }} />
+            <span className="text-white text-sm font-medium hidden sm:inline">Stats</span>
+          </button>
+
+          {/* Leaderboard Button - Top Right */}
+          <button
+            onClick={onOpenLeaderboard}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl backdrop-blur-md border transition-all hover:scale-105"
+            style={{ 
+              backgroundColor: `${config.uiPrimaryColor}cc`,
+              borderColor: `${config.uiAccentColor}40`
+            }}
+          >
+            <Trophy className="w-5 h-5" style={{ color: config.uiAccentColor }} />
+            <span className="text-white text-sm font-medium hidden sm:inline">Leaderboard</span>
+          </button>
+        </div>
+
+        {/* Center Content */}
+        <div className="flex-1 flex flex-col items-center justify-center px-4">
+          {/* Title */}
           <h1 
-            className="text-5xl md:text-7xl font-bold mb-2"
+            className="text-5xl md:text-7xl lg:text-8xl font-bold mb-2 text-center"
             style={{ 
               color: config.uiAccentColor,
-              textShadow: `0 0 20px ${config.uiAccentColor}40`
+              textShadow: `0 0 30px ${config.uiAccentColor}60, 0 0 60px ${config.uiAccentColor}30`
             }}
           >
             MemeRooms
           </h1>
-          <p className="text-gray-400 text-sm md:text-base">
-            Escape the endless backrooms. Watch out for the nextbots.
-          </p>
+
+          {/* Version */}
+          <p className="text-gray-400 text-sm mb-8">v2026.06.03.1</p>
+
+          {/* Mode Selection */}
+          <div className="flex gap-3 mb-8">
+            {(Object.keys(GAME_MODE_CONFIGS) as GameMode[]).map((mode) => {
+              const modeConfig = GAME_MODE_CONFIGS[mode]
+              const isSelected = mode === selectedMode
+              return (
+                <button
+                  key={mode}
+                  onClick={() => setSelectedMode(mode)}
+                  className={`px-4 py-2 rounded-lg border transition-all duration-300 ${
+                    isSelected ? 'scale-105' : 'opacity-60 hover:opacity-100'
+                  }`}
+                  style={{
+                    borderColor: isSelected ? modeConfig.uiAccentColor : 'transparent',
+                    backgroundColor: isSelected ? `${modeConfig.uiAccentColor}20` : `${modeConfig.uiSecondaryColor}80`,
+                    fontFamily: modeConfig.fontFamily
+                  }}
+                >
+                  <span className="text-xl">{modeConfig.icon}</span>
+                  <span className="text-white text-sm ml-2 hidden sm:inline">{modeConfig.name.split(' ')[0]}</span>
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex flex-col gap-3 w-full max-w-xs">
+            {/* Customize Button */}
+            <button
+              onClick={onOpenCustomize}
+              className="flex items-center justify-center gap-2 py-3 rounded-xl border transition-all hover:scale-[1.02] relative"
+              style={{ 
+                backgroundColor: `${config.uiSecondaryColor}cc`,
+                borderColor: `${config.uiAccentColor}40`
+              }}
+            >
+              <Paintbrush className="w-5 h-5" style={{ color: config.uiAccentColor }} />
+              <span className="text-white font-medium">Customize</span>
+              {isUsingCustomSettings && (
+                <span 
+                  className="absolute -top-1 -right-1 w-3 h-3 rounded-full"
+                  style={{ backgroundColor: config.uiAccentColor }}
+                />
+              )}
+            </button>
+
+            {/* Start Game Button */}
+            <button
+              onClick={() => onStartGame(selectedMode)}
+              className="flex items-center justify-center gap-2 py-4 rounded-xl text-white text-xl font-bold transition-all hover:scale-[1.02] active:scale-[0.98]"
+              style={{ 
+                backgroundColor: config.uiAccentColor,
+                boxShadow: `0 0 40px ${config.uiAccentColor}60`
+              }}
+            >
+              <Play className="w-6 h-6" fill="currentColor" />
+              START GAME
+            </button>
+          </div>
         </div>
 
-        {/* Mode Selection */}
-        <div className="grid grid-cols-3 gap-3 md:gap-4">
-          {(Object.keys(GAME_MODE_CONFIGS) as GameMode[]).map((mode) => {
-            const modeConfig = GAME_MODE_CONFIGS[mode]
-            const isSelected = mode === selectedMode
-            return (
-              <button
-                key={mode}
-                onClick={() => setSelectedMode(mode)}
-                className={`p-4 md:p-6 rounded-xl border-2 transition-all duration-300 ${
-                  isSelected 
-                    ? 'scale-105' 
-                    : 'opacity-70 hover:opacity-100'
-                }`}
-                style={{
-                  borderColor: isSelected ? modeConfig.uiAccentColor : 'transparent',
-                  backgroundColor: `${modeConfig.uiSecondaryColor}cc`,
-                  boxShadow: isSelected ? `0 0 30px ${modeConfig.uiAccentColor}40` : 'none',
-                  fontFamily: modeConfig.fontFamily
+        {/* Bottom Bar */}
+        <div className="flex justify-between items-end p-4 md:p-6">
+          {/* YouTube Input - Bottom Left */}
+          <div className="relative">
+            {showYoutubeInput ? (
+              <div 
+                className="flex items-center gap-2 p-2 rounded-xl backdrop-blur-md border"
+                style={{ 
+                  backgroundColor: `${config.uiPrimaryColor}cc`,
+                  borderColor: `${config.uiAccentColor}40`
                 }}
               >
-                <div className="text-3xl md:text-4xl mb-2">{modeConfig.icon}</div>
-                <div className="text-white text-sm md:text-base font-bold">{modeConfig.name}</div>
+                <Music className="w-4 h-4 text-gray-400 shrink-0" />
+                <input
+                  type="text"
+                  value={youtubeUrl}
+                  onChange={(e) => onYoutubeUrlChange(e.target.value)}
+                  placeholder="YouTube URL..."
+                  className="w-40 sm:w-56 px-2 py-1 rounded bg-black/30 text-white text-sm placeholder-gray-500 focus:outline-none"
+                />
+                <button
+                  onClick={() => setShowYoutubeInput(false)}
+                  className="p-1 rounded hover:bg-white/10"
+                >
+                  <X className="w-4 h-4 text-gray-400" />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowYoutubeInput(true)}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl backdrop-blur-md border transition-all hover:scale-105"
+                style={{ 
+                  backgroundColor: `${config.uiPrimaryColor}cc`,
+                  borderColor: `${config.uiAccentColor}40`
+                }}
+              >
+                <Music className="w-4 h-4" style={{ color: youtubeUrl ? config.uiAccentColor : '#9ca3af' }} />
+                <span className="text-gray-400 text-xs hidden sm:inline">
+                  {youtubeUrl ? 'Audio set' : 'Custom audio'}
+                </span>
               </button>
-            )
-          })}
-        </div>
-
-        {/* Custom Textures Drop Zone */}
-        <div 
-          ref={dropZoneRef}
-          className={`p-4 md:p-6 rounded-xl border-2 border-dashed transition-all duration-300 ${
-            isDragging ? 'border-white bg-white/10' : 'border-gray-600'
-          }`}
-          style={{ backgroundColor: `${config.uiSecondaryColor}80` }}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-        >
-          <div className="text-center">
-            <p className="text-gray-300 text-sm md:text-base mb-2">
-              Drag & drop images here to customize Nextbots
-            </p>
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="px-4 py-2 rounded-lg text-white text-sm transition-colors"
-              style={{ backgroundColor: config.uiAccentColor }}
-            >
-              Or Browse Files
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={handleFileSelect}
-              className="hidden"
-            />
+            )}
           </div>
-          
-          {customTextures.length > 0 && (
-            <div className="flex flex-wrap gap-2 mt-4 justify-center">
-              {customTextures.map((texture, index) => (
-                <div key={index} className="relative group">
-                  <img 
-                    src={texture} 
-                    alt={`Custom ${index + 1}`}
-                    className="w-12 h-12 md:w-16 md:h-16 object-cover rounded-lg"
-                  />
-                  <button
-                    onClick={() => removeTexture(index)}
-                    className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
 
-        {/* YouTube URL Input */}
-        <div 
-          className="p-4 rounded-xl"
-          style={{ backgroundColor: `${config.uiSecondaryColor}80` }}
-        >
-          <label className="block text-gray-300 text-sm mb-2">
-            🎵 YouTube Audio Override (Playlist or Video URL)
-          </label>
-          <input
-            type="text"
-            value={youtubeUrl}
-            onChange={(e) => onYoutubeUrlChange(e.target.value)}
-            placeholder="https://youtube.com/watch?v=... or playlist URL"
-            className="w-full px-4 py-3 rounded-lg bg-black/30 border border-gray-600 text-white placeholder-gray-500 focus:border-white/50 focus:outline-none transition-colors"
-          />
-        </div>
-
-        {/* Play Button */}
-        <button
-          onClick={() => onStartGame(selectedMode)}
-          className="w-full py-4 md:py-5 rounded-xl text-xl md:text-2xl font-bold text-white transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
-          style={{ 
-            backgroundColor: config.uiAccentColor,
-            boxShadow: `0 0 40px ${config.uiAccentColor}60`
-          }}
-        >
-          ▶ START GAME
-        </button>
-
-        {/* Stats Button */}
-        <button
-          onClick={() => setShowStats(true)}
-          className="w-full py-3 rounded-xl text-gray-300 border border-gray-600 hover:border-gray-400 transition-colors"
-        >
-          📊 View Stats
-        </button>
-
-        {/* Credits */}
-        <div className="text-right text-gray-500 text-sm">
-          Made by <span className="text-gray-400 font-bold"><a target="_blank" href="https://dewanmukto.github.io">Dewan Mukto</a></span>
+          {/* Credits - Bottom Right */}
+          <div className="text-right text-gray-500 text-xs sm:text-sm">
+            Made by{' '}
+            <a 
+              href="https://dewanmukto.github.io" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-gray-400 hover:text-white transition-colors"
+            >
+              Dewan Mukto
+            </a>
+          </div>
         </div>
       </div>
 
@@ -248,12 +231,21 @@ export function MainMenu({
             style={{ backgroundColor: config.uiSecondaryColor }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 
-              className="text-2xl md:text-3xl font-bold mb-6"
-              style={{ color: config.uiAccentColor }}
-            >
-              📊 Your Stats
-            </h2>
+            <div className="flex justify-between items-center mb-6">
+              <h2 
+                className="text-2xl md:text-3xl font-bold flex items-center gap-2"
+                style={{ color: config.uiAccentColor }}
+              >
+                <BarChart3 className="w-6 h-6" />
+                Your Stats
+              </h2>
+              <button
+                onClick={() => setShowStats(false)}
+                className="p-2 rounded-lg hover:bg-white/10 transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
             
             <div className="space-y-4">
               <div className="flex justify-between text-gray-300">
@@ -266,7 +258,10 @@ export function MainMenu({
               </div>
               
               <div className="mt-6">
-                <h3 className="text-lg font-bold text-white mb-3">🏆 Top 3 High Scores</h3>
+                <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
+                  <Trophy className="w-5 h-5" style={{ color: config.uiAccentColor }} />
+                  Top 3 High Scores
+                </h3>
                 {stats.highScores.length === 0 ? (
                   <p className="text-gray-500 text-sm">No high scores yet. Play to set records!</p>
                 ) : (
@@ -292,14 +287,6 @@ export function MainMenu({
                 )}
               </div>
             </div>
-            
-            <button
-              onClick={() => setShowStats(false)}
-              className="mt-6 w-full py-3 rounded-lg text-white transition-colors"
-              style={{ backgroundColor: config.uiAccentColor }}
-            >
-              Close
-            </button>
           </div>
         </div>
       )}

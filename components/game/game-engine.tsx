@@ -2,7 +2,7 @@
 
 import { useRef, useCallback } from 'react'
 import * as THREE from 'three'
-import { GameMode, GAME_MODE_CONFIGS, PlayerState } from '@/lib/game/types'
+import { GameMode, GAME_MODE_CONFIGS, PlayerState, CustomEntitySettings } from '@/lib/game/types'
 import { BackroomsGenerator } from '@/lib/game/backrooms'
 import { EntityManager } from '@/lib/game/entities'
 import { PlayerController } from '@/lib/game/player'
@@ -16,6 +16,7 @@ interface GameEngineProps {
   onHealthChange: (health: number) => void
   onPlayerStateChange: (state: PlayerState) => void
   onGameOver: (finalScore: number) => void
+  customEntitySettings?: CustomEntitySettings
 }
 
 export function useGameEngine({
@@ -26,6 +27,7 @@ export function useGameEngine({
   onHealthChange,
   onPlayerStateChange,
   onGameOver,
+  customEntitySettings,
 }: GameEngineProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<THREE.Scene | null>(null)
@@ -48,7 +50,15 @@ export function useGameEngine({
   const initScene = useCallback(() => {
     if (!containerRef.current || isInitializedRef.current) return
 
-    const config = GAME_MODE_CONFIGS[currentModeRef.current]
+    const baseConfig = GAME_MODE_CONFIGS[currentModeRef.current]
+    
+    // Apply custom entity settings if provided
+    const config = customEntitySettings ? {
+      ...baseConfig,
+      entitySpeed: customEntitySettings.speed,
+      entityDetectionRange: customEntitySettings.detectionRange,
+      entityBehavior: customEntitySettings.behavior,
+    } : baseConfig
 
     // Scene setup
     const scene = new THREE.Scene()
@@ -161,7 +171,7 @@ export function useGameEngine({
     return () => {
       window.removeEventListener('resize', handleResize)
     }
-  }, [customTextures, youtubeUrl])
+  }, [customTextures, youtubeUrl, customEntitySettings])
 
   const gameLoop = useCallback(() => {
     if (!isInitializedRef.current) return

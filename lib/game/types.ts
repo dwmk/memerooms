@@ -57,6 +57,25 @@ export interface GameStats {
   }>
 }
 
+// Player identity for leaderboard (anonymous, stored in localStorage)
+export interface PlayerIdentity {
+  username: string
+  discriminator: string // 4-digit number as string, e.g. "1234"
+}
+
+// Custom entity settings for the Customize modal
+export interface CustomEntitySettings {
+  speed: number // 3-15
+  detectionRange: number // 10-80
+  behavior: 'creeping' | 'steady' | 'chaotic'
+}
+
+export const DEFAULT_CUSTOM_ENTITY_SETTINGS: CustomEntitySettings = {
+  speed: 8,
+  detectionRange: 40,
+  behavior: 'steady'
+}
+
 export interface GameState {
   mode: GameMode
   isPlaying: boolean
