@@ -292,11 +292,11 @@ export class BackroomsGenerator {
   }
 
   private createChunkGeometry(chunkKey: string) {
-    const [chunkXStr, chunkZStr] = chunkKey.split(',')
-    const chunkX = parseInt(chunkXStr) * this.chunkSize
-    const chunkZ = parseInt(chunkZStr) * this.chunkSize
+  const [chunkXStr, chunkZStr] = chunkKey.split(',')
+  const chunkX = parseInt(chunkXStr) * this.chunkSize
+  const chunkZ = parseInt(chunkZStr) * this.chunkSize
 
-    // Floor
+  // Floor
     const floorGeometry = new THREE.PlaneGeometry(this.chunkSize, this.chunkSize)
     const floorMaterial = this.createFloorMaterial()
     const floor = new THREE.Mesh(floorGeometry, floorMaterial)
@@ -314,62 +314,53 @@ export class BackroomsGenerator {
     ceiling.userData.type = 'ceiling'
     this.scene.add(ceiling)
 
-    // Generate maze-like walls
-    const seed = this.hashCode(chunkKey)
-    const random = this.seededRandom(seed)
 
-    // Create spacious rooms with strategic wall placements
+  const seed = this.hashCode(chunkKey)
+  const random = this.seededRandom(seed)
+  const roomStyleType = random()
+
+  // Structure types selection loop
+  if (roomStyleType < 0.35) {
+    // 1. STYLE A: THE LONG CORRIDOR SYSTEM
+    // Build parallel structural barrier paths reminiscent of Level 0
+    this.createWall(chunkX, chunkZ + this.chunkSize / 3, this.chunkSize - 12, 0.4, false)
+    this.createWall(chunkX + 12, chunkZ + (this.chunkSize / 3) * 2, this.chunkSize - 12, 0.4, false)
+  } else if (roomStyleType < 0.70) {
+    // 2. STYLE B: LARGE MATRICES OPEN OFFICE ROOM 
+    // Sparse openings with dividing partitions
     for (let x = 0; x < this.chunkSize; x += ROOM_SIZE) {
       for (let z = 0; z < this.chunkSize; z += ROOM_SIZE) {
-        const worldX = chunkX + x
-        const worldZ = chunkZ + z
-
-        // Main corridor walls - less dense, more open
-        if (random() > 0.7) {
-          // Full wall segment
-          this.createWall(worldX, worldZ, ROOM_SIZE, 0.3, false)
-        } else if (random() > 0.5) {
-          // Partial wall with doorway
-          const doorPos = random()
-          if (doorPos < 0.33) {
-            this.createWall(worldX + CORRIDOR_WIDTH, worldZ, ROOM_SIZE - CORRIDOR_WIDTH, 0.3, false)
-          } else if (doorPos < 0.66) {
-            this.createWall(worldX, worldZ, ROOM_SIZE - CORRIDOR_WIDTH, 0.3, false)
-          } else {
-            // Wall with center opening
-            this.createWall(worldX, worldZ, (ROOM_SIZE - CORRIDOR_WIDTH) / 2, 0.3, false)
-            this.createWall(worldX + ROOM_SIZE - (ROOM_SIZE - CORRIDOR_WIDTH) / 2, worldZ, (ROOM_SIZE - CORRIDOR_WIDTH) / 2, 0.3, false)
-          }
+        if (random() > 0.6) {
+          // Create partition dividers that don't block intersections entirely
+          this.createWall(chunkX + x, chunkZ + z, ROOM_SIZE - 4, 0.3, random() > 0.5)
         }
-
-        // Perpendicular walls
-        if (random() > 0.7) {
-          this.createWall(worldX, worldZ, 0.3, ROOM_SIZE, true)
-        } else if (random() > 0.5) {
-          const doorPos = random()
-          if (doorPos < 0.5) {
-            this.createWall(worldX, worldZ + CORRIDOR_WIDTH, 0.3, ROOM_SIZE - CORRIDOR_WIDTH, true)
-          } else {
-            this.createWall(worldX, worldZ, 0.3, ROOM_SIZE - CORRIDOR_WIDTH, true)
-          }
-        }
-
-        // Occasional support columns
-        if (random() > 0.85) {
-          this.createColumn(worldX + ROOM_SIZE / 2, worldZ + ROOM_SIZE / 2)
+        // Consistent structural support structural load pillar columns
+        if (random() > 0.8) {
+          this.createColumn(chunkX + x + ROOM_SIZE / 2, chunkZ + z + ROOM_SIZE / 2)
         }
       }
     }
-
-    // Add fluorescent lights on ceiling
-    for (let x = LIGHT_SPACING / 2; x < this.chunkSize; x += LIGHT_SPACING) {
-      for (let z = LIGHT_SPACING / 2; z < this.chunkSize; z += LIGHT_SPACING) {
-        if (this.lights.length < this.maxLights) {
-          this.createLight(chunkX + x, chunkZ + z)
-        }
+  } else {
+    // 3. STYLE C: CLOSED DENSE OFFICE DEAD-ENDS
+    // Generates cozy maze clusters
+    for (let x = ROOM_SIZE; x < this.chunkSize; x += ROOM_SIZE) {
+      this.createWall(chunkX + x, chunkZ, 0.4, this.chunkSize - 16, true)
+      // Open doorway cuts
+      if (random() > 0.5) {
+        this.createWall(chunkX + x - ROOM_SIZE / 2, chunkZ + ROOM_SIZE, ROOM_SIZE, 0.4, false)
       }
     }
   }
+
+  // Consistent lighting framework attachment setup loop
+  for (let x = LIGHT_SPACING / 2; x < this.chunkSize; x += LIGHT_SPACING) {
+    for (let z = LIGHT_SPACING / 2; z < this.chunkSize; z += LIGHT_SPACING) {
+      if (this.lights.length < this.maxLights) {
+        this.createLight(chunkX + x, chunkZ + z)
+      }
+    }
+  }
+}
 
   private createWall(x: number, z: number, width: number, depth: number, isVertical: boolean) {
     const geometry = isVertical 
