@@ -168,26 +168,22 @@ export class PlayerController {
     let inputX = 0
     let inputZ = 0
 
-    // Keyboard input
     if (this.keys.has('keyw') || this.keys.has('arrowup')) inputZ -= 1
     if (this.keys.has('keys') || this.keys.has('arrowdown')) inputZ += 1
     if (this.keys.has('keya') || this.keys.has('arrowleft')) inputX -= 1
     if (this.keys.has('keyd') || this.keys.has('arrowright')) inputX += 1
 
-    // Mobile joystick input
     if (this.joystickActive) {
       inputX = this.joystickX
       inputZ = -this.joystickY
     }
 
-    // Normalize input
     const inputLength = Math.sqrt(inputX * inputX + inputZ * inputZ)
     if (inputLength > 1) {
       inputX /= inputLength
       inputZ /= inputLength
     }
 
-    // Calculate movement direction based on camera rotation
     const forward = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.state.rotation.y)
     const right = new THREE.Vector3(1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.state.rotation.y)
 
@@ -195,7 +191,6 @@ export class PlayerController {
     moveDir.addScaledVector(forward, -inputZ)
     moveDir.addScaledVector(right, inputX)
 
-    // Apply movement with bhop boost
     const effectiveSpeed = MOVE_SPEED * this.state.bhopMultiplier
     const control = this.state.isGrounded ? 1 : AIR_CONTROL
 
@@ -204,7 +199,6 @@ export class PlayerController {
       this.state.velocity.z += moveDir.z * effectiveSpeed * control * deltaTime * 10
     }
 
-    // Apply friction
     if (this.state.isGrounded) {
       this.state.velocity.x *= FRICTION
       this.state.velocity.z *= FRICTION
@@ -213,10 +207,8 @@ export class PlayerController {
       this.state.velocity.z *= 0.99
     }
 
-    // Apply gravity
     this.state.velocity.y -= GRAVITY * deltaTime
 
-    // Clamp velocity
     const horizontalVel = Math.sqrt(this.state.velocity.x ** 2 + this.state.velocity.z ** 2)
     if (horizontalVel > MAX_VELOCITY) {
       const scale = MAX_VELOCITY / horizontalVel
@@ -224,74 +216,95 @@ export class PlayerController {
       this.state.velocity.z *= scale
     }
 
-    // Apply velocity to position
     const newPosition = {
       x: this.state.position.x + this.state.velocity.x * deltaTime,
       y: this.state.position.y + this.state.velocity.y * deltaTime,
       z: this.state.position.z + this.state.velocity.z * deltaTime
     }
 
-    // Collision detection with walls
-    const playerRadius = 0.5
-    const playerHeight = 1.7
+    // Vertical Physics: Raycast down to find ground planes/ramps dynamically
+    const playerHeight = 1.7;
+    let groundY = -100; // Deep fallback
     
-    for (const collider of this.colliders) {
-      const box = new THREE.Box3().setFromObject(collider)
+    const groundColliders = this.colliders.filter(c => c.userData.isGround)
+    const wallColliders = this.colliders.filter(c => c.userData.isWall)
+
+    if (groundColliders.length > 0) {
+      // Start ray just above current head height to detect going up ramps seamlessly
+      const rayStart = new THREE.Vector3(newPosition.x, newPosition.y + 1, newPosition.z);
+      const raycaster = new THREE.Raycaster(rayStart, new THREE.Vector3(0, -1, 0), 0, 10);
+      const intersects = raycaster.intersectObjects(groundColliders);
       
-      // Expand box by player radius for collision
-      box.expandByScalar(playerRadius)
+      if (intersects.length > 0) {
+        groundY = intersects[0].point.y;
+      } else {
+        // Fallback for extreme drops: scan from the sky
+        const highRaycaster = new THREE.Raycaster(new THREE.Vector3(newPosition.x, 100, newPosition.z), new THREE.Vector3(0, -1, 0));
+        const highIntersects = highRaycaster.intersectObjects(groundColliders);
+        if (highIntersects.length > 0) groundY = highIntersects[0].point.y;
+      }
+    } else {
+      groundY = 0; // Absolute fallback
+    }
+
+    if (newPosition.y <= groundY + playerHeight) {
+      newPosition.y = groundY + playerHeight;
       
-      const playerPos = new THREE.Vector3(newPosition.x, newPosition.y, newPosition.z)
+      if (!this.state.isGrounded) {
+        this.landingTime = currentTime;
+      }
+      
+      this.state.isGrounded = true;
+      this.state.velocity.y = 0;
+      
+      if (!this.state.isBhopping) {
+        this.state.bhopMultiplier = Math.max(1, this.state.bhopMultiplier * 0.95);
+      }
+    } else {
+      this.state.isGrounded = false;
+    }
+
+    // Horizontal Physics: AABB checking for vertical walls only
+    const playerRadius = 0.5;
+    for (const collider of wallColliders) {
+      const box = new THREE.Box3().setFromObject(collider);
+      
+      // Ignore walls that are safely above or below the player on different floors
+      if (box.max.y <= newPosition.y - playerHeight + 0.1 || box.min.y >= newPosition.y + 0.1) {
+        continue;
+      }
+
+      box.expandByScalar(playerRadius);
+      const playerPos = new THREE.Vector3(newPosition.x, newPosition.y, newPosition.z);
       
       if (box.containsPoint(playerPos)) {
-        // Find closest point on box and push player out
-        const closestPoint = new THREE.Vector3()
-        box.clampPoint(playerPos, closestPoint)
+        const closestPoint = new THREE.Vector3();
+        box.clampPoint(playerPos, closestPoint);
         
-        const pushDir = playerPos.clone().sub(closestPoint).normalize()
+        const pushDir = playerPos.clone().sub(closestPoint).normalize();
         
         if (Math.abs(pushDir.x) > Math.abs(pushDir.z)) {
-          newPosition.x = this.state.position.x
-          this.state.velocity.x = 0
+          newPosition.x = this.state.position.x;
+          this.state.velocity.x = 0;
         } else {
-          newPosition.z = this.state.position.z
-          this.state.velocity.z = 0
+          newPosition.z = this.state.position.z;
+          this.state.velocity.z = 0;
         }
       }
     }
 
-    // Ground collision
-    if (newPosition.y < playerHeight) {
-      newPosition.y = playerHeight
-      
-      if (!this.state.isGrounded) {
-        this.landingTime = currentTime
-      }
-      
-      this.state.isGrounded = true
-      this.state.velocity.y = 0
-      
-      // Decay bhop multiplier when on ground
-      if (!this.state.isBhopping) {
-        this.state.bhopMultiplier = Math.max(1, this.state.bhopMultiplier * 0.95)
-      }
-    } else {
-      this.state.isGrounded = false
-    }
+    this.state.position = newPosition;
 
-    this.state.position = newPosition
-
-    // Update camera
     this.camera.position.set(
       this.state.position.x,
       this.state.position.y,
       this.state.position.z
-    )
-    this.camera.rotation.order = 'YXZ'
-    this.camera.rotation.y = this.state.rotation.y
-    this.camera.rotation.x = this.state.rotation.x
+    );
+    this.camera.rotation.order = 'YXZ';
+    this.camera.rotation.y = this.state.rotation.y;
+    this.camera.rotation.x = this.state.rotation.x;
 
-    return { ...this.state }
+    return { ...this.state };
   }
 
   getPosition(): THREE.Vector3 {

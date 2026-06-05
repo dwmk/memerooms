@@ -137,34 +137,40 @@ export class EntityManager {
 
     this.mutationTime += deltaTime
 
+    // Collect ground segments dynamically for entity Y-axis adaptation
+    const groundObjects = this.scene.children.filter(
+      c => c instanceof THREE.Mesh && c.userData.isGround
+    ) as THREE.Mesh[];
+
     // First pass: Update all existing entities
     this.entities.forEach(({ state, mesh, sprite }) => {
       const dx = playerPosition.x - state.position.x
+      const dy = playerPosition.y - state.position.y
       const dz = playerPosition.z - state.position.z
-      const distanceToPlayer = Math.sqrt(dx * dx + dz * dz)
+      const distanceToPlayer = Math.sqrt(dx * dx + dy * dy + dz * dz) // 3D Distance
 
-      // Remove entities that are too far away to despawn old ones
       if (distanceToPlayer > 500) {
-        return // Will be cleaned up later
+        return
       }
 
-      // Check if player is in detection range
       if (distanceToPlayer < this.config.entityDetectionRange) {
         state.isChasing = true
         isBeingChased = true
 
-        // Move towards player
-        const dirX = dx / distanceToPlayer
-        const dirZ = dz / distanceToPlayer
+        // Isolate horizontal vector for pure running speed
+        const horizontalDist = Math.sqrt(dx * dx + dz * dz)
+        let dirX = 0, dirZ = 0
+        if (horizontalDist > 0.1) {
+          dirX = dx / horizontalDist
+          dirZ = dz / horizontalDist
+        }
 
         let speed = this.config.entitySpeed
 
-        // Apply behavior modifiers
         if (this.config.entityBehavior === 'creeping') {
           speed *= 0.5 + Math.sin(currentTime * 0.5) * 0.2
         } else if (this.config.entityBehavior === 'chaotic') {
           speed *= 1 + Math.sin(currentTime * 5) * 0.5
-          // Add random direction changes
           const chaos = Math.sin(currentTime * 10 + state.position.x) * 0.3
           state.position.x += chaos * deltaTime
         }
@@ -172,8 +178,8 @@ export class EntityManager {
         state.position.x += dirX * speed * deltaTime
         state.position.z += dirZ * speed * deltaTime
 
-        // Check for collision with player
-        if (distanceToPlayer < 1.5) {
+        // Player collision calculation (requires true 3D distance now)
+        if (distanceToPlayer < 2.0) {
           if (currentTime - this.lastDamageTime > DAMAGE_COOLDOWN) {
             damageTaken = DAMAGE_AMOUNT
             this.lastDamageTime = currentTime
@@ -181,10 +187,23 @@ export class EntityManager {
         }
       } else {
         state.isChasing = false
-        // Wander randomly when not chasing, but stay within reasonable distance
         if (distanceToPlayer < 120) {
           state.position.x += (Math.random() - 0.5) * deltaTime * 2
           state.position.z += (Math.random() - 0.5) * deltaTime * 2
+        }
+      }
+
+      // Physics: Smooth Y transition based on floor topology below the entity
+      if (groundObjects.length > 0) {
+        const raycaster = new THREE.Raycaster(
+          new THREE.Vector3(state.position.x, 100, state.position.z), 
+          new THREE.Vector3(0, -1, 0)
+        );
+        const intersects = raycaster.intersectObjects(groundObjects);
+        if (intersects.length > 0) {
+          const targetY = intersects[0].point.y + ENTITY_HEIGHT / 2;
+          // Interpolate for smooth transition when scaling ramps
+          state.position.y += (targetY - state.position.y) * 10 * deltaTime;
         }
       }
 
@@ -200,27 +219,23 @@ export class EntityManager {
         sprite.material.rotation = state.tiltAngle
       }
 
-      // Update mesh and sprite positions
-      sprite.position.set(state.position.x, ENTITY_HEIGHT / 2, state.position.z)
+      sprite.position.set(state.position.x, state.position.y, state.position.z)
       mesh.position.copy(sprite.position)
-
-      // Billboard effect - always face camera
       sprite.lookAt(this.camera.position)
     })
 
-    // Second pass: Clean up entities that are too far
     const entitiesToRemove: string[] = []
     this.entities.forEach(({ state }, id) => {
       const dx = playerPosition.x - state.position.x
+      const dy = playerPosition.y - state.position.y
       const dz = playerPosition.z - state.position.z
-      const distanceToPlayer = Math.sqrt(dx * dx + dz * dz)
+      const distanceToPlayer = Math.sqrt(dx * dx + dy * dy + dz * dz)
       
       if (distanceToPlayer > 150) {
         entitiesToRemove.push(id)
       }
     })
     
-    // Remove distant entities
     entitiesToRemove.forEach(id => {
       const entity = this.entities.get(id)
       if (entity) {
@@ -230,8 +245,6 @@ export class EntityManager {
       }
     })
 
-    // Spawn new entities continuously - much more aggressive spawning
-    // Spawn if not at max capacity
     const maxEntities = Math.max(8, 3 + Math.floor(Math.sqrt(currentTime)))
     
     if (this.entities.size < maxEntities && Math.random() < 0.005) {
@@ -239,19 +252,18 @@ export class EntityManager {
       const distance = 40 + Math.random() * 40
       const spawnPos = new THREE.Vector3(
         playerPosition.x + Math.cos(angle) * distance,
-        0,
+        playerPosition.y, // Inject at the player's general floor level
         playerPosition.z + Math.sin(angle) * distance
       )
       this.spawnEntity(spawnPos)
     }
 
-    // Always spawn some entities even if not being chased
     if (this.entities.size < 3) {
       const angle = Math.random() * Math.PI * 2
       const distance = 50 + Math.random() * 30
       const spawnPos = new THREE.Vector3(
         playerPosition.x + Math.cos(angle) * distance,
-        0,
+        playerPosition.y,
         playerPosition.z + Math.sin(angle) * distance
       )
       this.spawnEntity(spawnPos)

@@ -291,107 +291,151 @@ export class BackroomsGenerator {
     }
   }
 
-  private createChunkGeometry(chunkKey: string) {
-  const [chunkXStr, chunkZStr] = chunkKey.split(',')
-  const chunkX = parseInt(chunkXStr) * this.chunkSize
-  const chunkZ = parseInt(chunkZStr) * this.chunkSize
+private createChunkGeometry(chunkKey: string) {
+    const [chunkXStr, chunkZStr] = chunkKey.split(',')
+    const chunkX = parseInt(chunkXStr) * this.chunkSize
+    const chunkZ = parseInt(chunkZStr) * this.chunkSize
 
-  // Floor
-    const floorGeometry = new THREE.PlaneGeometry(this.chunkSize, this.chunkSize)
-    const floorMaterial = this.createFloorMaterial()
-    const floor = new THREE.Mesh(floorGeometry, floorMaterial)
-    floor.rotation.x = -Math.PI / 2
-    floor.position.set(chunkX + this.chunkSize / 2, 0, chunkZ + this.chunkSize / 2)
-    floor.userData.type = 'floor'
-    this.scene.add(floor)
+    const seed = this.hashCode(chunkKey)
+    const random = this.seededRandom(seed)
+    const roomStyleType = random()
 
-    // Ceiling
+    // Base Floor (Ground Level)
+    this.createFloorSegment(chunkX + this.chunkSize / 2, 0, chunkZ + this.chunkSize / 2, this.chunkSize, this.chunkSize)
+
+    // Main Ceiling (Double height to accommodate 2 floors)
+    const chunkHeight = WALL_HEIGHT * 2
     const ceilingGeometry = new THREE.PlaneGeometry(this.chunkSize, this.chunkSize)
     const ceilingMaterial = this.createCeilingMaterial()
     const ceiling = new THREE.Mesh(ceilingGeometry, ceilingMaterial)
     ceiling.rotation.x = Math.PI / 2
-    ceiling.position.set(chunkX + this.chunkSize / 2, WALL_HEIGHT, chunkZ + this.chunkSize / 2)
+    ceiling.position.set(chunkX + this.chunkSize / 2, chunkHeight, chunkZ + this.chunkSize / 2)
     ceiling.userData.type = 'ceiling'
     this.scene.add(ceiling)
 
-
-  const seed = this.hashCode(chunkKey)
-  const random = this.seededRandom(seed)
-  const roomStyleType = random()
-
-  // Structure types selection loop
-  if (roomStyleType < 0.35) {
-    // 1. STYLE A: THE LONG CORRIDOR SYSTEM
-    // Build parallel structural barrier paths reminiscent of Level 0
-    this.createWall(chunkX, chunkZ + this.chunkSize / 3, this.chunkSize - 12, 0.4, false)
-    this.createWall(chunkX + 12, chunkZ + (this.chunkSize / 3) * 2, this.chunkSize - 12, 0.4, false)
-  } else if (roomStyleType < 0.70) {
-    // 2. STYLE B: LARGE MATRICES OPEN OFFICE ROOM 
-    // Sparse openings with dividing partitions
-    for (let x = 0; x < this.chunkSize; x += ROOM_SIZE) {
-      for (let z = 0; z < this.chunkSize; z += ROOM_SIZE) {
-        if (random() > 0.6) {
-          // Create partition dividers that don't block intersections entirely
-          this.createWall(chunkX + x, chunkZ + z, ROOM_SIZE - 4, 0.3, random() > 0.5)
+    // Procedural Architecture Distribution
+    if (roomStyleType < 0.35) {
+      // STYLE A: Dense Classic Labyrinth (Full height walls)
+      for (let x = ROOM_SIZE; x < this.chunkSize; x += ROOM_SIZE) {
+        for (let z = 0; z < this.chunkSize; z += ROOM_SIZE) {
+           if (random() > 0.3) {
+             this.createWall(chunkX + x, 0, chunkZ + z + ROOM_SIZE / 2, 0.4, ROOM_SIZE, chunkHeight, true)
+           }
+           if (random() > 0.5) {
+             this.createWall(chunkX + x - ROOM_SIZE / 2, 0, chunkZ + z, ROOM_SIZE, 0.4, chunkHeight, false)
+           }
         }
-        // Consistent structural support structural load pillar columns
-        if (random() > 0.8) {
-          this.createColumn(chunkX + x + ROOM_SIZE / 2, chunkZ + z + ROOM_SIZE / 2)
+      }
+    } else if (roomStyleType < 0.70) {
+      // STYLE B: Multi-level Facility with Ramps and Balconies
+      // 2nd Floor covering half of the room
+      this.createFloorSegment(chunkX + this.chunkSize / 2, WALL_HEIGHT, chunkZ + this.chunkSize * 0.75, this.chunkSize, this.chunkSize / 2)
+      
+      // Support columns for the 2nd floor
+      for (let x = ROOM_SIZE / 2; x < this.chunkSize; x += ROOM_SIZE) {
+        this.createColumn(chunkX + x, 0, chunkZ + this.chunkSize / 2 + 0.5, WALL_HEIGHT)
+      }
+
+      // Ramp bridging Ground Floor to 2nd Floor
+      this.createRamp(chunkX + this.chunkSize / 2, 0, chunkZ + this.chunkSize / 2, 8, 16, WALL_HEIGHT, false)
+      
+      // Walls on Ground Floor
+      this.createWall(chunkX + this.chunkSize / 4, 0, chunkZ + this.chunkSize / 4, this.chunkSize / 2, 0.4, WALL_HEIGHT, false)
+      
+      // Walls on 2nd Floor (Acting as balcony barriers)
+      this.createWall(chunkX + this.chunkSize / 2, WALL_HEIGHT, chunkZ + this.chunkSize / 2 + 1, this.chunkSize, 0.4, 2, false)
+    } else {
+      // STYLE C: Colossal Pillar Halls (Open expanses with columns)
+      for (let x = ROOM_SIZE / 2; x < this.chunkSize; x += ROOM_SIZE) {
+        for (let z = ROOM_SIZE / 2; z < this.chunkSize; z += ROOM_SIZE) {
+          if (random() > 0.4) {
+            this.createColumn(chunkX + x, 0, chunkZ + z, chunkHeight)
+          }
+          // Occasional low partition walls
+          if (random() > 0.8) {
+            this.createWall(chunkX + x, 0, chunkZ + z, ROOM_SIZE - 2, 0.6, WALL_HEIGHT * 0.7, random() > 0.5)
+          }
         }
       }
     }
-  } else {
-    // 3. STYLE C: CLOSED DENSE OFFICE DEAD-ENDS
-    // Generates cozy maze clusters
-    for (let x = ROOM_SIZE; x < this.chunkSize; x += ROOM_SIZE) {
-      this.createWall(chunkX + x, chunkZ, 0.4, this.chunkSize - 16, true)
-      // Open doorway cuts
-      if (random() > 0.5) {
-        this.createWall(chunkX + x - ROOM_SIZE / 2, chunkZ + ROOM_SIZE, ROOM_SIZE, 0.4, false)
+
+    // Multi-level Lighting Framework
+    for (let yLevel = WALL_HEIGHT; yLevel <= chunkHeight; yLevel += WALL_HEIGHT) {
+      for (let x = LIGHT_SPACING / 2; x < this.chunkSize; x += LIGHT_SPACING) {
+        for (let z = LIGHT_SPACING / 2; z < this.chunkSize; z += LIGHT_SPACING) {
+          if (this.lights.length < this.maxLights) {
+            // Less lights in double-height open areas unless attached to something, spread randomly
+            if (random() > 0.2) this.createLight(chunkX + x, yLevel, chunkZ + z)
+          }
+        }
       }
     }
   }
 
-  // Consistent lighting framework attachment setup loop
-  for (let x = LIGHT_SPACING / 2; x < this.chunkSize; x += LIGHT_SPACING) {
-    for (let z = LIGHT_SPACING / 2; z < this.chunkSize; z += LIGHT_SPACING) {
-      if (this.lights.length < this.maxLights) {
-        this.createLight(chunkX + x, chunkZ + z)
-      }
-    }
-  }
-}
-
-  private createWall(x: number, z: number, width: number, depth: number, isVertical: boolean) {
+private createWall(x: number, y: number, z: number, width: number, depth: number, height: number, isVertical: boolean) {
     const geometry = isVertical 
-      ? new THREE.BoxGeometry(depth, WALL_HEIGHT, width)
-      : new THREE.BoxGeometry(width, WALL_HEIGHT, depth)
+      ? new THREE.BoxGeometry(depth, height, width)
+      : new THREE.BoxGeometry(width, height, depth)
     const material = this.createWallMaterial()
     const wall = new THREE.Mesh(geometry, material)
     
     if (isVertical) {
-      wall.position.set(x + depth / 2, WALL_HEIGHT / 2, z + width / 2)
+      wall.position.set(x + depth / 2, y + height / 2, z + width / 2)
     } else {
-      wall.position.set(x + width / 2, WALL_HEIGHT / 2, z + depth / 2)
+      wall.position.set(x + width / 2, y + height / 2, z + depth / 2)
     }
     
     wall.userData.type = 'wall'
     wall.userData.isCollider = true
+    wall.userData.isWall = true
     this.scene.add(wall)
   }
 
-  private createColumn(x: number, z: number) {
-    const geometry = new THREE.BoxGeometry(0.8, WALL_HEIGHT, 0.8)
+  private createColumn(x: number, y: number, z: number, height: number) {
+    const geometry = new THREE.BoxGeometry(0.8, height, 0.8)
     const material = this.createWallMaterial()
     const column = new THREE.Mesh(geometry, material)
-    column.position.set(x, WALL_HEIGHT / 2, z)
+    column.position.set(x, y + height / 2, z)
     column.userData.type = 'wall'
     column.userData.isCollider = true
+    column.userData.isWall = true
     this.scene.add(column)
   }
 
-  private createLight(x: number, z: number) {
-    // Fluorescent light fixture (rectangular panel)
+  private createFloorSegment(x: number, y: number, z: number, width: number, depth: number) {
+    const geometry = new THREE.PlaneGeometry(width, depth)
+    const material = this.createFloorMaterial()
+    const floor = new THREE.Mesh(geometry, material)
+    floor.rotation.x = -Math.PI / 2
+    floor.position.set(x, y, z)
+    floor.userData.type = 'floor'
+    floor.userData.isCollider = true
+    floor.userData.isGround = true
+    this.scene.add(floor)
+  }
+
+  private createRamp(x: number, y: number, z: number, width: number, depth: number, height: number, isVertical: boolean) {
+    const length = Math.sqrt(depth * depth + height * height)
+    const angle = Math.atan2(height, depth)
+    
+    const geometry = new THREE.BoxGeometry(width, 0.5, length)
+    const material = this.createFloorMaterial()
+    const ramp = new THREE.Mesh(geometry, material)
+    
+    ramp.position.set(x, y + height / 2, z)
+    
+    if (isVertical) {
+      ramp.rotation.y = Math.PI / 2
+    }
+    ramp.rotation.x = -angle
+    
+    ramp.userData.type = 'floor'
+    ramp.userData.isCollider = true
+    ramp.userData.isGround = true
+    this.scene.add(ramp)
+  }
+
+ private createLight(x: number, y: number, z: number) {
     const fixtureGeometry = new THREE.BoxGeometry(2.5, 0.15, 0.5)
     const fixtureMaterial = new THREE.MeshBasicMaterial({
       color: this.config.lightColor,
@@ -399,15 +443,13 @@ export class BackroomsGenerator {
       opacity: 0.95
     })
     const fixture = new THREE.Mesh(fixtureGeometry, fixtureMaterial)
-    fixture.position.set(x, WALL_HEIGHT - 0.08, z)
+    fixture.position.set(x, y - 0.08, z)
     this.scene.add(fixture)
 
-    // Point light with much larger range
     const light = new THREE.PointLight(this.config.lightColor, this.config.lightIntensity, 50)
-    light.position.set(x, WALL_HEIGHT - 0.4, z)
+    light.position.set(x, y - 0.4, z)
     this.scene.add(light)
     
-    // Store light data for flickering
     this.lights.push({ 
       light, 
       fixture, 
@@ -415,6 +457,8 @@ export class BackroomsGenerator {
       flickerPhase: Math.random() * Math.PI * 2 
     })
   }
+
+ 
 
   updateLights(deltaTime: number) {
     this.flickerTime += deltaTime
@@ -458,7 +502,8 @@ export class BackroomsGenerator {
   getColliders(): THREE.Mesh[] {
     const colliders: THREE.Mesh[] = []
     this.scene.traverse((object) => {
-      if (object instanceof THREE.Mesh && object.userData.isCollider) {
+      // Fetch both vertical walls and horizontal grounds for the new raycasting physics
+      if (object instanceof THREE.Mesh && (object.userData.isCollider || object.userData.isGround || object.userData.isWall)) {
         colliders.push(object)
       }
     })
