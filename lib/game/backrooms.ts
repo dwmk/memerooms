@@ -393,12 +393,42 @@ export class BackroomsGenerator {
   }
 
   /**
-   * Main generation entry point. Now also accepts playerY (floor index).
+   * Call this ONCE right after constructing the generator, before spawning
+   * the player.  Pre-generates all chunks surrounding the origin so there
+   * is solid ground waiting when the player first loads in.
+   *
+   * Returns the world-space Y the player should spawn at (just above floor 0).
+   */
+  initSpawn(): number {
+    // Generate a 3×3 ring at floor 0 synchronously
+    this.generateChunk(0, 0, 0)
+    // Floor slab top face sits at Y = 0 exactly.
+    // Return a Y that places the player's feet (camera eye ≈ 1.7) safely above it.
+    return 1.8
+  }
+
+  /**
+   * Main generation entry point.
+   * playerY is the world-space Y of the player (defaults to 0 for backward
+   * compatibility with callers that only pass X and Z).
    * Generates a 3×3 ring of chunks in XZ and ±1 floor in Y.
    */
-  generateChunk(playerX: number, playerY: number, playerZ: number) {
-    const currentFloor = Math.round(playerY / FLOOR_STEP)
-    const floorRange = 1  // generate 1 floor above and below current
+  generateChunk(playerX: number, playerYOrZ: number, playerZ?: number) {
+    // Support old 2-arg signature:  generateChunk(x, z)
+    // and new 3-arg signature:      generateChunk(x, y, z)
+    let worldY: number
+    let wz: number
+    if (playerZ === undefined) {
+      // Called as generateChunk(x, z) — playerYOrZ is actually Z
+      worldY = 0
+      wz     = playerYOrZ
+    } else {
+      worldY = playerYOrZ
+      wz     = playerZ
+    }
+
+    const currentFloor = isNaN(worldY) ? 0 : Math.round(worldY / FLOOR_STEP)
+    const floorRange   = 1
 
     for (let dy = -floorRange; dy <= floorRange; dy++) {
       const floorY = currentFloor + dy
@@ -409,7 +439,7 @@ export class BackroomsGenerator {
           const key = this.chunkKey(
             playerX + dx * this.chunkSize,
             floorY,
-            playerZ + dz * this.chunkSize
+            wz + dz * this.chunkSize
           )
           if (!this.generatedChunks.has(key)) {
             this.createChunk(key)
@@ -525,9 +555,9 @@ export class BackroomsGenerator {
     }
 
     // ── Stairwells / shafts connecting floors ─────────────────
-    // Place a vertical shaft at a chunk-specific position so
-    // adjacent floors align.  Mark as collider-free opening.
-    if (rng() > 0.4) {
+    // Read the gate RNG call first so it doesn't depend on furniture count.
+    const buildStair = rng() > 0.4
+    if (buildStair) {
       this.buildStairwell(chunkX, worldY, chunkZ, rng, wallVariant)
     }
   }
@@ -919,10 +949,12 @@ export class BackroomsGenerator {
   }
 
   private addFloorSlab(cx: number, y: number, cz: number, size: number, variant = 'default') {
-    const geo = new THREE.PlaneGeometry(size, size)
+    // Use a thin box (not a plane) so raycasts from any direction reliably collide.
+    // The top face sits exactly at `y`; the box extends 0.3 units downward.
+    const SLAB_THICKNESS = 0.3
+    const geo = new THREE.BoxGeometry(size, SLAB_THICKNESS, size)
     const mesh = new THREE.Mesh(geo, this.floorMat(variant))
-    mesh.rotation.x = -Math.PI/2
-    mesh.position.set(cx, y, cz)
+    mesh.position.set(cx, y - SLAB_THICKNESS / 2, cz)
     mesh.userData.type='floor'; mesh.userData.isCollider=true; mesh.userData.isGround=true
     this.scene.add(mesh)
   }
